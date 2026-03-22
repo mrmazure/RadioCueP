@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>RadioCueP - RadioTools.be</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <link rel="icon" href="favicon.png" type="image/png">
+</head>
+
+<body>
+
+    <!-- ══════════════════ HEADER ══════════════════ -->
+    <header class="app-header">
+        <div class="logo-container">
+            <img src="favicon.png" alt="RadioTools Logo" class="app-logo">
+            <div class="logo-text">
+                <h1 class="title">RadioTools <span class="subtitle">| RadioCueP By MrMazure</span></h1>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <!-- Undo / Redo -->
+            <button id="btnUndo" class="control-btn" title="Annuler (Ctrl+Z)">↩ Undo</button>
+            <button id="btnRedo" class="control-btn" title="Rétablir (Ctrl+Y)">↪ Redo</button>
+
+            <!-- Menu Dropdown -->
+            <div class="menu-dropdown" id="menuDropdown">
+                <button class="control-btn menu-toggle" id="btnMenu" title="Menu">
+                    <span class="menu-chevron">
+                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5"
+                            fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </span>
+                    Menu
+                </button>
+                <div class="menu-panel hidden" id="menuPanel">
+                    <button id="btnNew">🆕 Nouveau conducteur</button>
+                    <div class="menu-sep"></div>
+                    <label class="menu-file-label" for="jsonFile">📥 Import Conductor</label>
+                    <button id="btnExport">📤 Export JSON</button>
+                    <div class="menu-sep"></div>
+                    <button id="btnOpenShareModal">☁️ Sauvegarder sur le cloud…</button>
+                </div>
+            </div>
+
+            <input type="file" id="jsonFile" accept=".json" style="display:none;" />
+
+            <!-- Live Screen -->
+            <button id="btnLiveScreen" class="control-btn btn-live" title="Ouvrir ou partager l'écran live">
+                🖥 Live Screen
+            </button>
+        </div>
+    </header>
+
+    <!-- ══════════════════ MAIN APP ══════════════════ -->
+    <main id="app">
+
+        <div class="top-section">
+
+            <!-- Éditeur -->
+            <div class="editor-pane">
+                <div class="pane-header">
+                    <h2>Éditeur de Conducteur</h2>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="editorStats" style="font-size: 0.8rem; color: var(--text-muted);">0 blocs</span>
+                        <button id="btnTypesManager" class="control-btn" title="Gérer les types de blocs"
+                            style="height:26px; padding:0 8px; font-size:0.78rem;">⚙️ Types</button>
+                    </div>
+                </div>
+                <div class="list-container" id="listView"></div>
+                <div class="editor-footer">
+                    <button id="addBlockBtn" class="control-btn btn-primary"
+                        style="width:100%; justify-content:center;">+ Ajouter bloc</button>
+                </div>
+            </div>
+
+            <!-- Statut -->
+            <div class="status-pane">
+                <div class="status-top block-info">
+                    <div id="curIcon" class="block-icon" style="background: var(--bg-element);">💿</div>
+                    <div class="block-text">
+                        <div class="block-type" id="curType">EN ATTENTE</div>
+                        <div class="block-name" id="curName">Veuillez importer un conducteur</div>
+                    </div>
+                </div>
+
+                <div class="status-center">
+                    <div id="xxlCountdown" class="xxl-countdown">00:00</div>
+                    <div id="nextBlock" class="next-block"></div>
+                </div>
+
+                <div class="status-bottom">
+                    <div class="transport-controls">
+                        <button id="btnPlay" class="control-btn btn-primary">► Play</button>
+                        <button id="btnPause" class="control-btn">⏸ Pause</button>
+                        <button id="btnReset" class="control-btn">⏮ Reset</button>
+                        <button id="btnNext" class="control-btn">⏭ Suivant</button>
+                    </div>
+                    <div class="toggle-group" style="display:flex; justify-content:center; margin-top:10px;">
+                        <label class="toggle-wrap" title="Pause automatique à chaque début de nouveau bloc">
+                            <input type="checkbox" id="autoPauseToggle">
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            <span class="toggle-text">Pause auto fin séquence</span>
+                        </label>
+                    </div>
+                    <div class="time-info">
+                        <div class="info-box">
+                            <div class="info-label">TEMPS RESTANT</div>
+                            <div id="totalRemaining" class="info-value">00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Timeline -->
+        <div class="bottom-section">
+            <div class="timeline-toolbar">
+                <span class="timeline-label">TIMELINE</span>
+                <div class="zoom-controls">
+                    <button id="zoomOut" class="zoom-btn" title="Dézoom">−</button>
+                    <span id="zoomLabel" class="zoom-label">100%</span>
+                    <button id="zoomIn" class="zoom-btn" title="Zoom">+</button>
+                </div>
+                <span class="kbd-hint">Espace: Play/Pause · → / ←: Bloc suiv./préc. · R: Reset · Ctrl+Z/Y:
+                    Undo/Redo</span>
+            </div>
+            <div id="timeline-container" class="timeline-container">
+                <div class="progress-bar-container">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <div class="timeline-graduations" id="timelineGraduations"></div>
+                <div id="timelineTrack" class="timeline-track"></div>
+                <div id="playhead" class="playhead"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ══════════════════ MODAL — Live Screen ══════════════════ -->
+    <div id="liveModal" class="modal hidden">
+        <div class="modal-content share-modal-content">
+            <div class="share-modal-header">
+                <h2>🖥 Live Screen</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div id="peerStatus" class="peer-status" title="P2P Inactif"></div>
+                    <button class="btn-icon" id="btnCloseLiveModal">✕</button>
+                </div>
+            </div>
+
+            <!-- Option 1 : ouvrir une fenêtre -->
+            <div class="share-section">
+                <div class="share-section-title">
+                    <span class="share-icon">📺</span>
+                    <div>
+                        <strong>Ouvrir l'écran live</strong>
+                        <p>Affiche le compte à rebours en grand sur une nouvelle fenêtre. Idéal pour un second moniteur
+                            ou une TV de studio.</p>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="btnOpenLiveWindow">📺 Ouvrir dans une nouvelle fenêtre</button>
+            </div>
+
+            <div class="share-divider"></div>
+
+            <!-- Option 2 : partager le lien -->
+            <div class="share-section">
+                <div class="share-section-title">
+                    <span class="share-icon">🔗</span>
+                    <div>
+                        <strong>Partager le lien live</strong>
+                        <p>Partage ce lien pour afficher l'écran live sur un autre appareil. La synchronisation est en
+                            temps réel via P2P.</p>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" id="btnStartLiveSession">🔗 Générer le lien</button>
+                <div id="liveLinkWrapper" class="link-wrapper hidden">
+                    <input type="text" id="liveLinkInput" readonly placeholder="Lien en cours de génération…">
+                    <button class="btn btn-secondary btn-copy" id="btnCopyLiveLink">📋 Copier</button>
+                </div>
+                <div id="liveQrCode" class="qr-container hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL — Cloud Share ══════════════════ -->
+    <div id="shareModal" class="modal hidden">
+        <div class="modal-content share-modal-content">
+            <div class="share-modal-header">
+                <h2>☁️ Partager le conducteur</h2>
+                <button class="btn-icon" id="btnCloseShareModal">✕</button>
+            </div>
+
+            <div class="share-section">
+                <div class="share-section-title">
+                    <span class="share-icon">☁️</span>
+                    <div>
+                        <strong>Sauvegarde cloud chiffrée</strong>
+                        <p>Génère un lien unique pour partager le conducteur. Les données sont chiffrées côté client —
+                            le serveur ne peut pas les lire.</p>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" id="btnGenerateCloudLink">☁️ Générer le lien de partage</button>
+                <div id="cloudStatus"></div>
+                <div id="cloudLinkWrapper" class="link-wrapper hidden">
+                    <input type="text" id="cloudLinkInput" readonly>
+                    <button class="btn btn-secondary btn-copy" id="btnCopyCloudLink">📋 Copier</button>
+                </div>
+                <p id="cloudNotice" class="share-notice hidden">🔒 Chiffrement de bout en bout (AES-256-GCM). Lien
+                    valide 100 jours. Le serveur ne peut pas déchiffrer vos données.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL — Types Manager ══════════════════ -->
+    <div id="typesModal" class="modal hidden">
+        <div class="modal-content types-modal-content">
+            <div class="share-modal-header">
+                <h2>⚙️ Types de blocs</h2>
+                <button class="btn-icon" id="btnCloseTypesModal">✕</button>
+            </div>
+            <div id="typesList" class="types-list"></div>
+            <div class="types-add-form">
+                <button type="button" id="btnNewTypeIcon" class="type-icon-btn" title="Choisir un emoji">📝</button>
+                <input type="color" class="li-color" id="newTypeColor" value="#6366f1" title="Couleur"
+                    style="flex-shrink:0;">
+                <input type="text" id="newTypeName" class="li-input" placeholder="Nom du nouveau type…" style="flex:1;">
+                <button id="btnAddType" class="btn btn-primary" style="width:auto; padding:0 14px; flex-shrink:0;">+
+                    Ajouter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emoji Picker overlay (partagé) -->
+    <div id="emojiPickerOverlay" class="emoji-picker-overlay hidden">
+        <emoji-picker class="dark"></emoji-picker>
+    </div>
+
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
