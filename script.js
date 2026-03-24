@@ -50,10 +50,20 @@ function migrateBlockTypes(types) {
 let blocks = [];
 let isPlaying = false;
 let currentElapsedSeconds = 0;
-let lastTimestamp = 0;
+let lastTimeMs = performance.now();
 let rafId = null;
 let currentBlockIndex = -1;
 let autoPauseEnabled = false;
+
+function advanceTime() {
+    const now = performance.now();
+    const delta = (now - lastTimeMs) / 1000;
+    lastTimeMs = now;
+    if (isPlaying) {
+        currentElapsedSeconds += delta;
+        updateStatusPanel();
+    }
+}
 
 // Show metadata
 let showName = '';
@@ -68,6 +78,8 @@ let zoomFactor = 1.0;
 // PeerJS
 let myPeerId = null;
 let peerInitialized = false;
+let pendingLiveWindow = false;
+let pendingLiveLink = false;
 
 // Mirror dead-reckoning
 let mirrorMasterElapsed = 0;
@@ -167,10 +179,11 @@ function init() {
     if (isMirror) {
         document.body.classList.add('mirror-mode');
     } else {
-        lastTimestamp = 0;
+        lastTimeMs = performance.now();
         rafId = requestAnimationFrame(loop);
 
         setInterval(() => {
+            advanceTime();
             if (mirrorClients.length > 0) {
                 mirrorClients.forEach(c => c.send({ type: 'sync', isPlaying, currentElapsedSeconds }));
             }
@@ -191,7 +204,7 @@ function handleKeydown(e) {
             if (isPlaying) {
                 isPlaying = false;
             } else if (blocks.length > 0) {
-                isPlaying = true; lastTimestamp = 0;
+                isPlaying = true; lastTimeMs = performance.now();
             }
             break;
         case 'ArrowRight': e.preventDefault(); jumpToNextBlock(); break;
@@ -257,16 +270,31 @@ function initModals() {
     document.getElementById('btnLiveScreen')?.addEventListener('click', openLiveModal);
     document.getElementById('btnCloseLiveModal')?.addEventListener('click', () => document.getElementById('liveModal').classList.add('hidden'));
 
-    document.getElementById('btnOpenLiveWindow')?.addEventListener('click', () => {
+    document.getElementById('btnOpenLiveWindow')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        if (!peerInitialized) {
+            pendingLiveWindow = true;
+            initPeerJS();
+            btn.textContent = '⏳ Connexion...';
+            return;
+        }
         const url = getLiveUrl();
         if (url) {
             window.open(url, '_blank');
+            btn.textContent = '📺 Ouvrir dans une nouvelle fenêtre';
         } else {
-            showLiveStatus('⏳ Connexion P2P pas encore prête. Réessayez dans un instant.');
+            pendingLiveWindow = true;
+            btn.textContent = '⏳ Connexion...';
         }
     });
 
     document.getElementById('btnStartLiveSession')?.addEventListener('click', () => {
+        if (!peerInitialized) {
+            pendingLiveLink = true;
+            initPeerJS();
+            showLiveStatus('⏳ Connexion P2P en cours…');
+            return;
+        }
         if (!myPeerId) { showLiveStatus('⏳ Connexion P2P en cours…'); return; }
         showLiveLink();
     });
@@ -338,8 +366,8 @@ function initModals() {
 function openLiveModal() {
     const liveModal = document.getElementById('liveModal');
     liveModal.classList.remove('hidden');
-    // Lazy-init PeerJS on first open
-    if (!peerInitialized) initPeerJS();
+    // We no longer init PeerJS here. Wait for button click.
+    
     // Si le lien est déjà disponible, l'afficher directement
     if (myPeerId) {
         showLiveLink();
@@ -1013,10 +1041,8 @@ function loop(timestamp) {
         rafId = requestAnimationFrame(loop);
         return;
     }
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const delta = (timestamp - lastTimestamp) / 1000;
-    lastTimestamp = timestamp;
-    if (isPlaying) { currentElapsedSeconds += delta; updateStatusPanel(); updateTimelineVisuals(); }
+    advanceTime();
+    updateTimelineVisuals();
     rafId = requestAnimationFrame(loop);
 }
 
@@ -1060,7 +1086,7 @@ function formatCountdown(secTotal) {
 
 function doReset() {
     isPlaying = false; currentElapsedSeconds = 0;
-    lastTimestamp = 0;
+    lastTimeMs = performance.now();
     currentBlockIndex = -1;
     document.querySelectorAll('#listView .list-item').forEach(el => el.classList.remove('active-block'));
     updateStatusPanel(); updateTimelineVisuals();
@@ -1078,7 +1104,7 @@ jsonFileIn.addEventListener('change', (e) => {
 
 btnPlay.addEventListener('click', () => {
     if (!blocks.length) return;
-    isPlaying = true; lastTimestamp = 0;
+    isPlaying = true; lastTimeMs = performance.now();
     if (!rafId) rafId = requestAnimationFrame(loop);
 });
 
@@ -1119,9 +1145,14 @@ function initPeerJS() {
         myPeerId = id;
         peerStatus.className = 'peer-status connected';
 
-        // Si la modal Live Screen est ouverte, afficher le lien automatiquement
-        const liveModal = document.getElementById('liveModal');
-        if (liveModal && !liveModal.classList.contains('hidden')) {
+        if (pendingLiveWindow) {
+            pendingLiveWindow = false;
+            const url = getLiveUrl();
+            if (url) window.open(url, '_blank');
+        }
+
+        if (pendingLiveLink) {
+            pendingLiveLink = false;
             showLiveLink();
         }
 
